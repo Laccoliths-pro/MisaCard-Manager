@@ -11,6 +11,10 @@ def parse_card_line(line: str) -> Optional[Dict]:
     """
     解析单行卡片数据
 
+    支持多种格式：
+    1. 完整格式：卡密: mio-xxx 额度: 1 有效期: 1小时
+    2. 仅卡密：mio-xxx (使用默认额度1和有效期1小时)
+
     Args:
         line: 包含卡片信息的文本行
 
@@ -22,20 +26,38 @@ def parse_card_line(line: str) -> Optional[Dict]:
     if not line:
         return None
 
-    # 正则表达式匹配：卡密: xxx 额度: xxx 有效期: xxx小时
-    pattern = r'卡密:\s*([^\s]+)\s+额度:\s*(\d+(?:\.\d+)?)\s+有效期:\s*(\d+)\s*小时'
-    match = re.search(pattern, line)
+    # 方式1: 尝试匹配完整格式：卡密: xxx 额度: xxx 有效期: xxx小时
+    full_pattern = r'卡密:\s*([^\s]+)\s+额度:\s*(\d+(?:\.\d+)?)\s+有效期:\s*(\d+)\s*小时'
+    match = re.search(full_pattern, line)
 
     if match:
         card_id = match.group(1).strip()
         card_limit = float(match.group(2))
         validity_hours = int(match.group(3))
 
-        return {
-            "card_id": card_id,
-            "card_limit": card_limit,
-            "validity_hours": validity_hours
-        }
+        # 验证卡密格式
+        if validate_card_id(card_id):
+            return {
+                "card_id": card_id,
+                "card_limit": card_limit,
+                "validity_hours": validity_hours
+            }
+
+    # 方式2: 尝试从文本中提取卡密（可能有"卡密:"前缀）
+    card_id_pattern = r'(?:卡密:\s*)?(mio-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'
+    match = re.search(card_id_pattern, line, re.IGNORECASE)
+
+    if match:
+        card_id = match.group(1).strip()
+
+        # 验证卡密格式
+        if validate_card_id(card_id):
+            # 只有卡密时，使用默认值
+            return {
+                "card_id": card_id,
+                "card_limit": 0.0,  # 默认额度0（激活后从API获取实际额度）
+                "validity_hours": 1  # 默认有效期1小时
+            }
 
     return None
 
