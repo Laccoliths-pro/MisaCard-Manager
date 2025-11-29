@@ -1,4 +1,4 @@
-# MisaCard 管理系统
+# MisaCard 管理系统【未做鉴权，仅推荐在局域网内使用】
 
 一个功能完善的虚拟卡管理系统，用于管理 MisaCard 虚拟信用卡，支持卡片激活、查询、批量导入、退款管理等功能。
 
@@ -55,7 +55,7 @@
 #### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/Laccoliths-pro/MisaCard-Manager.git
 cd backend
 ```
 
