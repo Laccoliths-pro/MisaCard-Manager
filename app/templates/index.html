@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MisaCard 管理系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .sidebar-item {
+            transition: all 0.2s ease;
+        }
+        .sidebar-item:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .sidebar-item.active {
+            background-color: rgba(59, 130, 246, 0.15);
+            border-left: 4px solid #3b82f6;
+        }
+        .table-row:hover {
+            background-color: #f9fafb;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .truncate-cell {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-active { background-color: #d1fae5; color: #065f46; }
+        .badge-inactive { background-color: #fee2e2; color: #991b1b; }
+        .badge-expired { background-color: #fef3c7; color: #92400e; }
+        .badge-deleted { background-color: #e5e7eb; color: #374151; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen overflow-hidden">
+        <!-- 侧边栏 -->
+        <aside class="w-64 bg-white shadow-lg flex-shrink-0">
+            <div class="p-6 border-b border-gray-200">
+                <h1 class="text-2xl font-bold text-blue-600">MisaCard</h1>
+                <p class="text-sm text-gray-500 mt-1">卡片管理系统</p>
+            </div>
+            <nav class="mt-6">
+                <a href="#" onclick="showPage('dashboard')" id="nav-dashboard" class="sidebar-item active flex items-center px-6 py-3 text-gray-700">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    概览
+                </a>
+                <a href="#" onclick="showPage('cards')" id="nav-cards" class="sidebar-item flex items-center px-6 py-3 text-gray-700">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    卡片列表
+                </a>
+                <a href="#" onclick="showPage('query')" id="nav-query" class="sidebar-item flex items-center px-6 py-3 text-gray-700">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    查询激活
+                </a>
+                <a href="#" onclick="showPage('import')" id="nav-import" class="sidebar-item flex items-center px-6 py-3 text-gray-700">
+                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    批量导入
+                </a>
+            </nav>
+            <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+                <div class="text-xs text-gray-500 mb-2">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="confirmDelete" checked class="mr-2">
+                        <span>删除时需要确认</span>
+                    </label>
+                </div>
+                <div class="text-xs text-gray-400">
+                    v2.0.0
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="flex-1 overflow-y-auto">
+            <!-- 概览页面 -->
+            <div id="page-dashboard" class="p-8">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">系统概览</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">有效卡片</p>
+                                <p class="text-3xl font-bold text-gray-800 mt-2" id="stat-total">0</p>
+                                <p class="text-xs text-gray-400 mt-1">不含已删除</p>
+                            </div>
+                            <div class="bg-blue-100 rounded-full p-3">
+                                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">已激活</p>
+                                <p class="text-3xl font-bold text-green-600 mt-2" id="stat-active">0</p>
+                            </div>
+                            <div class="bg-green-100 rounded-full p-3">
+                                <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">未激活</p>
+                                <p class="text-3xl font-bold text-yellow-600 mt-2" id="stat-inactive">0</p>
+                            </div>
+                            <div class="bg-yellow-100 rounded-full p-3">
+                                <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">总额度</p>
+                                <p class="text-3xl font-bold text-purple-600 mt-2" id="stat-limit">$0</p>
+                            </div>
+                            <div class="bg-purple-100 rounded-full p-3">
+                                <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 补充统计信息 -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">已过期</p>
+                                <p class="text-2xl font-bold text-orange-600 mt-1" id="stat-expired">0</p>
+                            </div>
+                            <svg class="w-6 h-6 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">已删除</p>
+                                <p class="text-2xl font-bold text-red-600 mt-1" id="stat-deleted">0</p>
+                            </div>
+                            <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">激活率</p>
+                                <p class="text-2xl font-bold text-blue-600 mt-1" id="stat-rate">0%</p>
+                            </div>
+                            <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-600 text-sm font-medium">平均额度</p>
+                                <p class="text-2xl font-bold text-purple-600 mt-1" id="stat-avg">$0</p>
+                            </div>
+                            <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">快速操作</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button onclick="showPage('query')" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition">
+                            查询并激活卡片
+                        </button>
+                        <button onclick="showPage('import')" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition">
+                            批量导入卡片
+                        </button>
+                        <button onclick="showPage('cards')" class="bg-purple-500 text-white px-6 py-3 rounded-lg hover:bg-purple-600 transition">
+                            查看卡片列表
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 卡片列表页面 -->
+            <div id="page-cards" class="p-8 hidden">
+                <div class="mb-6 flex justify-between items-center">
+                    <h2 class="text-3xl font-bold text-gray-800">卡片列表</h2>
+                    <div class="flex gap-2">
+                        <button onclick="copyUnrefundedCardNumbers()" class="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transition">
+                            <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            复制未退款卡号
+                        </button>
+                        <button onclick="loadCards()" class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+                            <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            刷新
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 统一账单地址信息 -->
+                <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-green-600 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div>
+                                <h4 class="text-sm font-semibold text-green-800 mb-1">统一账单地址</h4>
+                                <p class="text-green-700 font-mono text-sm" id="billingAddress">131 Lupine Drive, Torrington, WY 82240</p>
+                            </div>
+                        </div>
+                        <button onclick="copyBillingAddress()" class="ml-4 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            复制地址
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow mb-4 p-4">
+                    <div class="flex gap-4 mb-3">
+                        <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="搜索卡密、昵称或卡号..."
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <select id="statusFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">全部状态</option>
+                            <option value="active">已激活</option>
+                            <option value="inactive">未激活</option>
+                            <option value="expired">已过期</option>
+                            <option value="deleted">已删除</option>
+                        </select>
+                        <select id="refundFilter" class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">全部退款状态</option>
+                            <option value="requested">已申请退款</option>
+                            <option value="not_requested">未申请退款</option>
+                        </select>
+                        <button onclick="loadCards()" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition">
+                            搜索
+                        </button>
+                    </div>
+                    <!-- 批量操作栏 -->
+                    <div id="batchActions" class="hidden border-t pt-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">已选择 <span id="selectedCount" class="font-semibold text-blue-600">0</span> 张卡片</span>
+                            <div class="flex gap-2">
+                                <button onclick="batchToggleRefund()" class="px-4 py-2 bg-purple-500 text-white text-sm rounded-lg hover:bg-purple-600 transition">
+                                    批量标记退款
+                                </button>
+                                <button onclick="batchDelete()" class="px-4 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 transition">
+                                    批量删除
+                                </button>
+                                <button onclick="clearSelection()" class="px-4 py-2 bg-gray-500 text-white text-sm rounded-lg hover:bg-gray-600 transition">
+                                    取消选择
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left">
+                                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500">
+                                    </th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">卡密</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">卡号</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CVC</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">有效期</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">额度</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">到期时间</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">退款</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cardsTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- 数据将通过 JavaScript 动态加载 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="emptyState" class="hidden p-12 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                        </svg>
+                        <p class="mt-4 text-gray-500">暂无卡片数据</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 查询激活页面 -->
+            <div id="page-query" class="p-8 hidden">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">查询并激活卡片</h2>
+                <div class="max-w-2xl">
+                    <div class="bg-white rounded-lg shadow p-6 mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">卡密</label>
+                        <input
+                            type="text"
+                            id="queryCardId"
+                            placeholder="请输入卡密 (例如: mio-xxxxx)"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                        />
+                        <button
+                            onclick="queryCard()"
+                            class="w-full bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-600 transition"
+                        >
+                            查询并自动激活
+                        </button>
+                    </div>
+                    <div id="queryResult" class="hidden"></div>
+                    <div id="queryError" class="hidden"></div>
+                </div>
+            </div>
+
+            <!-- 批量导入页面 -->
+            <div id="page-import" class="p-8 hidden">
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">批量导入卡片</h2>
+                <div class="max-w-4xl">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                            </svg>
+                            <div>
+                                <h4 class="text-sm font-semibold text-blue-800 mb-1">导入说明</h4>
+                                <ul class="text-sm text-blue-700 space-y-1">
+                                    <li>✓ 批量导入<strong>仅将卡密添加到数据库</strong>，不会自动激活</li>
+                                    <li>✓ 导入后，卡片状态为"未激活"</li>
+                                    <li>✓ 需要在<strong>卡片列表</strong>中点击<strong>"激活"按钮</strong>手动激活每张卡片</li>
+                                    <li>✓ 激活时会自动从MisaCard API获取卡号、CVC等信息</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            粘贴卡片数据（支持多行）
+                        </label>
+                        <textarea
+                            id="importTextArea"
+                            rows="15"
+                            placeholder="粘贴卡片数据，每行一条&#10;格式：卡密: mio-xxx 额度: x 有效期: x小时&#10;&#10;示例：&#10;卡密: mio-f3dc27e4-e853-429a-9e4b-3294af7c25ca 额度: 1 有效期: 1小时&#10;卡密: mio-7441ca67-058b-4d98-885b-4774bfb7ba86 额度: 2 有效期: 1小时"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm"
+                        ></textarea>
+                        <p class="mt-2 text-sm text-gray-500">
+                            💡 提示：从文件或其他地方复制内容后，直接粘贴到上方文本框
+                        </p>
+                        <button
+                            onclick="importText()"
+                            class="mt-4 w-full bg-green-500 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-600 transition"
+                        >
+                            开始导入（仅导入，不激活）
+                        </button>
+                        <div id="importResult" class="mt-6"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 卡片详情模态框 -->
+    <div id="cardDetailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-gray-800">卡片详情</h3>
+                <button onclick="closeCardDetail()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="cardDetailContent" class="p-6"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 'dashboard';
+
+        // 页面切换
+        function showPage(page) {
+            // 隐藏所有页面
+            document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
+            // 移除所有导航激活状态
+            document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+
+            // 显示当前页面
+            document.getElementById('page-' + page).classList.remove('hidden');
+            document.getElementById('nav-' + page).classList.add('active');
+
+            currentPage = page;
+
+            // 加载页面数据
+            if (page === 'dashboard') loadDashboard();
+            if (page === 'cards') loadCards();
+        }
+
+        // 加载概览数据
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/cards/');
+                let allCards = await response.json();
+
+                // 分离有效卡片和已删除卡片
+                const cards = allCards.filter(card => card.status !== 'deleted');
+                const deletedCards = allCards.filter(card => card.status === 'deleted');
+
+                const total = cards.length;
+                const active = cards.filter(c => c.is_activated && c.status !== 'expired').length;
+                const inactive = cards.filter(c => !c.is_activated && c.status !== 'expired').length;
+                const expired = cards.filter(c => c.status === 'expired').length;
+                const deleted = deletedCards.length;
+                const totalLimit = cards.reduce((sum, c) => sum + (c.card_limit || 0), 0);
+
+                // 计算激活率
+                const activationRate = total > 0 ? ((active / total) * 100).toFixed(1) : 0;
+
+                // 计算平均额度
+                const avgLimit = total > 0 ? (totalLimit / total).toFixed(2) : 0;
+
+                document.getElementById('stat-total').textContent = total;
+                document.getElementById('stat-active').textContent = active;
+                document.getElementById('stat-inactive').textContent = inactive;
+                document.getElementById('stat-limit').textContent = '$' + totalLimit.toFixed(2);
+                document.getElementById('stat-expired').textContent = expired;
+                document.getElementById('stat-deleted').textContent = deleted;
+                document.getElementById('stat-rate').textContent = activationRate + '%';
+                document.getElementById('stat-avg').textContent = '$' + avgLimit;
+            } catch (error) {
+                console.error('加载概览数据失败:', error);
+            }
+        }
+
+        // 加载卡片列表
+        async function loadCards() {
+            const search = document.getElementById('searchInput')?.value || '';
+            const status = document.getElementById('statusFilter')?.value || '';
+            const refundFilter = document.getElementById('refundFilter')?.value || '';
+
+            try {
+                let url = '/api/cards/?';
+                if (search) url += 'search=' + encodeURIComponent(search) + '&';
+                if (status) url += 'status=' + encodeURIComponent(status);
+
+                const response = await fetch(url);
+                let cards = await response.json();
+
+                // 如果没有选择状态筛选，默认过滤掉已删除的卡片
+                // 如果已经选择了状态筛选，就完全信任后端的筛选结果
+                if (!status) {
+                    cards = cards.filter(card => card.status !== 'deleted');
+                }
+
+                // 应用退款状态筛选
+                if (refundFilter === 'requested') {
+                    cards = cards.filter(card => card.refund_requested === true);
+                } else if (refundFilter === 'not_requested') {
+                    // 未申请退款：包括 false、null、undefined
+                    cards = cards.filter(card => !card.refund_requested);
+                }
+
+                const tbody = document.getElementById('cardsTableBody');
+                const emptyState = document.getElementById('emptyState');
+
+                if (cards.length === 0) {
+                    tbody.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                } else {
+                    emptyState.classList.add('hidden');
+                    tbody.innerHTML = cards.map(card => {
+                        // 检查卡片是否过期
+                        const actualStatus = checkCardExpiration(card);
+                        const expireInfo = getExpireInfo(card);
+
+                        return `
+                        <tr class="table-row">
+                            <td class="px-4 py-4 whitespace-nowrap">
+                                <input type="checkbox" class="card-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500" value="${card.card_id}" onchange="updateSelection()">
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900 truncate-cell" title="${card.card_id}">${card.card_id}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">${card.card_number || '-'}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">${card.card_cvc || '-'}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">${card.card_exp_date || '-'}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">$${card.card_limit}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm ${expireInfo.color}">${expireInfo.text}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                ${getStatusBadge(actualStatus)}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                ${card.refund_requested
+                                    ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">已申请</span>'
+                                    : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">未申请</span>'}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                                <button onclick="viewCardDetail('${card.card_id}')" class="text-blue-600 hover:text-blue-900">详情</button>
+                                <button onclick="activateCardFromList('${card.card_id}')" class="text-green-600 hover:text-green-900">激活</button>
+                                <button onclick="toggleRefund('${card.card_id}', ${card.refund_requested})" class="text-purple-600 hover:text-purple-900">
+                                    ${card.refund_requested ? '取消退款' : '标记退款'}
+                                </button>
+                                <button onclick="deleteCard('${card.card_id}')" class="text-red-600 hover:text-red-900">删除</button>
+                            </td>
+                        </tr>
+                    `}).join('');
+                }
+            } catch (error) {
+                alert('加载卡片列表失败: ' + error.message);
+            }
+        }
+
+        // 检查卡片是否过期
+        function checkCardExpiration(card) {
+            // 如果已经标记为删除，返回deleted
+            if (card.status === 'deleted') {
+                return 'deleted';
+            }
+
+            // 如果有exp_date，检查是否过期
+            if (card.exp_date) {
+                const expireDate = new Date(card.exp_date);
+                const now = new Date();
+
+                if (now > expireDate) {
+                    return 'expired';
+                }
+            }
+
+            // 返回原始状态
+            return card.status;
+        }
+
+        // 获取到期时间信息
+        function getExpireInfo(card) {
+            if (!card.exp_date) {
+                return {
+                    text: '-',
+                    color: 'text-gray-500'
+                };
+            }
+
+            const expireDate = new Date(card.exp_date);
+            const now = new Date();
+            const diffMs = expireDate - now;
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffHours / 24);
+
+            let text = formatDate(card.exp_date);
+            let color = 'text-gray-900';
+
+            if (diffMs <= 0) {
+                // 已过期
+                text += ' (已过期)';
+                color = 'text-red-600 font-semibold';
+            } else if (diffHours <= 24) {
+                // 24小时内过期
+                text += ` (${diffHours}小时后)`;
+                color = 'text-orange-600 font-semibold';
+            } else if (diffDays <= 7) {
+                // 7天内过期
+                text += ` (${diffDays}天后)`;
+                color = 'text-yellow-600';
+            }
+
+            return { text, color };
+        }
+
+        // 状态徽章
+        function getStatusBadge(status) {
+            const badges = {
+                'active': '<span class="badge badge-active">已激活</span>',
+                'inactive': '<span class="badge badge-inactive">未激活</span>',
+                'expired': '<span class="badge badge-expired">已过期</span>',
+                'deleted': '<span class="badge badge-deleted">已删除</span>'
+            };
+            return badges[status] || '<span class="badge">' + status + '</span>';
+        }
+
+        // 查询并激活卡片
+        async function queryCard() {
+            const cardId = document.getElementById('queryCardId').value.trim();
+            if (!cardId) {
+                alert('请输入卡密');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/cards/${cardId}/activate`, { method: 'POST' });
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    displayQueryResult(data.card_data);
+                } else {
+                    displayQueryError(data.message || '查询失败');
+                }
+            } catch (error) {
+                displayQueryError('网络错误: ' + error.message);
+            }
+        }
+
+        // 显示查询结果
+        function displayQueryResult(card) {
+            const resultDiv = document.getElementById('queryResult');
+            const errorDiv = document.getElementById('queryError');
+
+            errorDiv.classList.add('hidden');
+            resultDiv.classList.remove('hidden');
+            resultDiv.innerHTML = `
+                <div class="bg-white rounded-lg shadow p-6 fade-in">
+                    <h3 class="text-xl font-bold mb-4 text-gray-800">卡片信息</h3>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div><span class="text-gray-600">卡密：</span><span class="font-semibold">${card.card_id}</span></div>
+                        <div><span class="text-gray-600">卡号：</span><span class="font-semibold">${card.card_number || '未激活'}</span></div>
+                        <div><span class="text-gray-600">CVC：</span><span class="font-semibold">${card.card_cvc || '未激活'}</span></div>
+                        <div><span class="text-gray-600">有效期：</span><span class="font-semibold">${card.card_exp_date || '未激活'}</span></div>
+                        <div><span class="text-gray-600">额度：</span><span class="font-semibold">$${card.card_limit}</span></div>
+                        <div><span class="text-gray-600">状态：</span>${getStatusBadge(card.status)}</div>
+                        <div><span class="text-gray-600">创建时间：</span><span class="font-semibold">${formatDate(card.create_time)}</span></div>
+                        ${card.card_activation_time ? `<div><span class="text-gray-600">激活时间：</span><span class="font-semibold">${formatDate(card.card_activation_time)}</span></div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // 显示查询错误
+        function displayQueryError(message) {
+            const resultDiv = document.getElementById('queryResult');
+            const errorDiv = document.getElementById('queryError');
+
+            resultDiv.classList.add('hidden');
+            errorDiv.classList.remove('hidden');
+            errorDiv.innerHTML = `
+                <div class="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg">
+                    ${message}
+                </div>
+            `;
+        }
+
+        // 批量导入
+        async function importText() {
+            const textArea = document.getElementById('importTextArea');
+            const content = textArea.value.trim();
+
+            if (!content) {
+                showToast('请粘贴卡片数据', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/import/text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+                const data = await response.json();
+
+                const resultDiv = document.getElementById('importResult');
+                if (response.ok) {
+                    resultDiv.innerHTML = `
+                        <div class="bg-green-50 border border-green-300 p-4 rounded-lg">
+                            <h3 class="font-bold text-green-800 mb-2">导入结果</h3>
+                            <p class="mb-1">✅ 成功: <span class="font-semibold">${data.success_count}</span> 张</p>
+                            <p class="mb-2">❌ 失败: <span class="font-semibold">${data.failed_count}</span> 张</p>
+                            ${data.failed_items.length > 0 ? '<div class="mt-3 pt-3 border-t border-green-200"><p class="text-sm font-semibold mb-2">失败详情：</p>' + data.failed_items.map(item => `<p class="text-sm text-red-600">• ${item.card_id}: ${item.reason}</p>`).join('') + '</div>' : ''}
+                        </div>
+                    `;
+                    if (data.success_count > 0) {
+                        textArea.value = '';
+                        showToast(`成功导入 ${data.success_count} 张卡片`, 'success');
+                    }
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="bg-red-50 border border-red-300 p-4 rounded-lg">
+                            <h3 class="font-bold text-red-800 mb-2">导入失败</h3>
+                            <p class="text-red-700">${data.detail || data.message || '未知错误'}</p>
+                        </div>
+                    `;
+                    showToast('导入失败', 'error');
+                }
+            } catch (error) {
+                showToast('导入失败: ' + error.message, 'error');
+            }
+        }
+
+        // 查看卡片详情
+        async function viewCardDetail(cardId) {
+            // 显示模态框和加载状态
+            const modal = document.getElementById('cardDetailModal');
+            const content = document.getElementById('cardDetailContent');
+
+            modal.classList.remove('hidden');
+            content.innerHTML = `
+                <div class="flex items-center justify-center py-12">
+                    <div class="text-center">
+                        <svg class="animate-spin h-12 w-12 text-blue-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="text-gray-600 text-lg font-medium">正在加载卡片信息...</p>
+                        <p class="text-gray-400 text-sm mt-2">请稍候</p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                const response = await fetch(`/api/cards/${cardId}`);
+                const card = await response.json();
+
+                // 查询消费记录（仅限已激活的卡片）
+                let transactionData = null;
+                if (card.card_number) {
+                    try {
+                        const txResponse = await fetch(`/api/cards/${cardId}/transactions`);
+                        if (txResponse.ok) {
+                            const txResult = await txResponse.json();
+                            transactionData = txResult.data;
+                        }
+                    } catch (e) {
+                        console.error('获取消费记录失败:', e);
+                    }
+                }
+                content.innerHTML = `
+                    <div class="space-y-6">
+                        <!-- 卡片基本信息 -->
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">基本信息</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">卡密</p>
+                                    <p class="font-semibold text-gray-900">${card.card_id}</p>
+                                </div>
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">卡号</p>
+                                    <p class="font-semibold text-gray-900">${card.card_number || '未激活'}</p>
+                                </div>
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">CVC</p>
+                                    <p class="font-semibold text-gray-900">${card.card_cvc || '未激活'}</p>
+                                </div>
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">有效期</p>
+                                    <p class="font-semibold text-gray-900">${card.card_exp_date || '未激活'}</p>
+                                </div>
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">账单地址</p>
+                                    <p class="font-semibold text-gray-900">${card.billing_address || '-'}</p>
+                                </div>
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">额度</p>
+                                    <p class="font-semibold text-gray-900">$${card.card_limit}</p>
+                                </div>
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">状态</p>
+                                    <p>${getStatusBadge(card.status)}</p>
+                                </div>
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">是否已激活</p>
+                                    <p class="font-semibold text-gray-900">${card.is_activated ? '是' : '否'}</p>
+                                </div>
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">创建时间</p>
+                                    <p class="font-semibold text-gray-900">${formatDate(card.create_time)}</p>
+                                </div>
+                                ${card.card_activation_time ? `
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">激活时间</p>
+                                    <p class="font-semibold text-gray-900">${formatDate(card.card_activation_time)}</p>
+                                </div>
+                                ` : ''}
+                                ${card.exp_date ? `
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">过期时间</p>
+                                    <p class="font-semibold text-gray-900">${formatDate(card.exp_date)}</p>
+                                </div>
+                                ` : ''}
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">退款状态</p>
+                                    <p>
+                                        ${card.refund_requested
+                                            ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">已申请退款</span>'
+                                            : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">未申请退款</span>'}
+                                    </p>
+                                </div>
+                                ${card.refund_requested_time ? `
+                                <div class="border-b pb-4">
+                                    <p class="text-sm text-gray-500">退款申请时间</p>
+                                    <p class="font-semibold text-gray-900">${formatDate(card.refund_requested_time)}</p>
+                                </div>
+                                ` : ''}
+                            </div>
+                            <div class="mt-6 flex gap-3">
+                                <button onclick="toggleRefund('${card.card_id}', ${card.refund_requested}); setTimeout(() => viewCardDetail('${card.card_id}'), 500)" class="flex-1 px-4 py-2 ${card.refund_requested ? 'bg-gray-500 hover:bg-gray-600' : 'bg-purple-500 hover:bg-purple-600'} text-white rounded-lg transition">
+                                    ${card.refund_requested ? '取消退款标记' : '标记为已申请退款'}
+                                </button>
+                            </div>
+                        </div>
+
+                        ${transactionData ? `
+                        <!-- 账户余额信息 -->
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">账户余额</h4>
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <p class="text-sm text-blue-600">可用额度</p>
+                                    <p class="text-2xl font-bold text-blue-900">$${transactionData.available || 0}</p>
+                                </div>
+                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                                    <p class="text-sm text-green-600">已入账</p>
+                                    <p class="text-2xl font-bold text-green-900">$${transactionData.posted || 0}</p>
+                                </div>
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                    <p class="text-sm text-yellow-600">待处理</p>
+                                    <p class="text-2xl font-bold text-yellow-900">$${transactionData.pending || 0}</p>
+                                </div>
+                                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <p class="text-sm text-red-600">不可用</p>
+                                    <p class="text-2xl font-bold text-red-900">$${transactionData.unavailable || 0}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 消费记录 -->
+                        <div>
+                            <h4 class="text-lg font-semibold text-gray-800 mb-4">消费记录</h4>
+                            ${transactionData.transactions && transactionData.transactions.length > 0 ? `
+                            <div class="space-y-3 max-h-96 overflow-y-auto">
+                                ${transactionData.transactions.map(tx => `
+                                <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition">
+                                    <div class="flex items-start justify-between mb-2">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <span class="font-semibold text-gray-900">${tx.bank_description || '-'}</span>
+                                                <span class="px-2 py-0.5 text-xs rounded ${tx.status === '失败' ? 'bg-red-100 text-red-800' : tx.status === '成功' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}">
+                                                    ${tx.status || '-'}
+                                                </span>
+                                            </div>
+                                            <div class="flex items-center gap-3 text-sm text-gray-600">
+                                                <span>${tx.created_at || '-'}</span>
+                                                <span class="text-gray-400">•</span>
+                                                <span>${tx.kind || '-'}</span>
+                                            </div>
+                                        </div>
+                                        <div class="text-right ml-4">
+                                            <div class="text-lg font-bold ${tx.amount < 0 ? 'text-red-600' : 'text-green-600'}">
+                                                ${tx.amount > 0 ? '+' : ''}$${Math.abs(tx.amount || 0).toFixed(2)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    ${tx.reason_for_failure ? `
+                                    <div class="mt-2 pt-2 border-t border-gray-100">
+                                        <p class="text-xs text-red-600">
+                                            <span class="font-semibold">失败原因：</span>${tx.reason_for_failure}
+                                        </p>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                `).join('')}
+                            </div>
+                            ` : '<p class="text-gray-500 text-center py-4">暂无消费记录</p>'}
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="text-center py-12">
+                        <svg class="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-red-600 text-lg font-semibold mb-2">加载失败</p>
+                        <p class="text-gray-600">${error.message}</p>
+                        <button onclick="closeCardDetail()" class="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+                            关闭
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // 关闭详情模态框
+        function closeCardDetail() {
+            document.getElementById('cardDetailModal').classList.add('hidden');
+        }
+
+        // 从列表激活卡片
+        async function activateCardFromList(cardId) {
+            if (!confirm('确定要激活这张卡片吗？')) return;
+            try {
+                const response = await fetch(`/api/cards/${cardId}/activate`, { method: 'POST' });
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showToast(data.message || '激活成功', 'success');
+                    loadCards();
+                    if (currentPage === 'dashboard') loadDashboard();
+                } else {
+                    showToast(data.message || '激活失败', 'error');
+                }
+            } catch (error) {
+                showToast('激活失败: ' + error.message, 'error');
+            }
+        }
+
+        // 删除卡片
+        async function deleteCard(cardId) {
+            // 检查是否需要确认
+            const needConfirm = document.getElementById('confirmDelete')?.checked ?? true;
+            if (needConfirm && !confirm('确定删除这张卡片吗？\n\n⚠️ 警告：删除后将永久从数据库中移除，无法恢复！')) return;
+            try {
+                const response = await fetch(`/api/cards/${cardId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    // 成功删除，刷新列表
+                    loadCards();
+                    if (currentPage === 'dashboard') loadDashboard();
+
+                    // 显示成功提示
+                    showToast('卡片已删除', 'success');
+                } else {
+                    const data = await response.json();
+                    showToast(data.detail || '删除失败', 'error');
+                }
+            } catch (error) {
+                showToast('删除失败: ' + error.message, 'error');
+            }
+        }
+
+        // 切换退款标记
+        async function toggleRefund(cardId, currentStatus) {
+            try {
+                const response = await fetch(`/api/cards/${cardId}/refund`, { method: 'POST' });
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    showToast(data.message, 'success');
+                    loadCards();
+                } else {
+                    showToast(data.message || '操作失败', 'error');
+                }
+            } catch (error) {
+                showToast('操作失败: ' + error.message, 'error');
+            }
+        }
+
+        // 一键复制未退款卡号
+        async function copyUnrefundedCardNumbers() {
+            try {
+                const response = await fetch('/api/cards/batch/unreturned-card-numbers');
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    const cardNumbers = data.data.card_numbers;
+                    const count = data.data.count;
+
+                    if (count === 0) {
+                        showToast('没有未退款的卡片', 'info');
+                        return;
+                    }
+
+                    // 将卡号复制到剪贴板（每行一个）
+                    const text = cardNumbers.join('\n');
+
+                    // 复制到剪贴板
+                    let copySuccess = false;
+                    try {
+                        // 检查是否支持 Clipboard API
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(text);
+                            copySuccess = true;
+                        } else {
+                            // 不支持 Clipboard API，直接使用备选方案
+                            fallbackCopyToClipboard(text);
+                            copySuccess = true;
+                        }
+                    } catch (err) {
+                        // 如果剪贴板API失败，使用备选方案
+                        fallbackCopyToClipboard(text);
+                        copySuccess = true;
+                    }
+
+                    if (copySuccess) {
+                        showToast(`已复制 ${count} 个卡号到剪贴板`, 'success');
+
+                        // 询问是否标记为已申请退款
+                        if (confirm(`已复制 ${count} 个卡号到剪贴板\n\n是否将这些卡片标记为"已申请退款"？`)) {
+                            await markCopiedCardsAsRefunded();
+                        }
+                    }
+                } else {
+                    showToast(data.message || '获取卡号失败', 'error');
+                }
+            } catch (error) {
+                showToast('操作失败: ' + error.message, 'error');
+            }
+        }
+
+        // 将已复制的卡片标记为已申请退款（后端已确保只返回已过期的卡片）
+        async function markCopiedCardsAsRefunded() {
+            try {
+                // 重新获取已过期未退款卡片列表（确保是最新的）
+                const response = await fetch('/api/cards/batch/unreturned-card-numbers');
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    const cardNumbers = data.data.card_numbers;
+
+                    if (cardNumbers.length === 0) {
+                        showToast('没有需要标记的已过期卡片', 'info');
+                        return;
+                    }
+
+                    // 获取所有卡片信息，找到对应的 card_id
+                    const cardsResponse = await fetch('/api/cards/?limit=1000');
+                    const allCards = await cardsResponse.json();
+
+                    // 筛选出需要标记的卡片（后端已保证都是已过期的）
+                    const cardsToMark = allCards.filter(card =>
+                        cardNumbers.includes(String(card.card_number)) && !card.refund_requested
+                    );
+
+                    if (cardsToMark.length === 0) {
+                        showToast('没有需要标记的卡片', 'info');
+                        return;
+                    }
+
+                    let successCount = 0;
+                    let failCount = 0;
+
+                    // 批量标记退款
+                    for (const card of cardsToMark) {
+                        try {
+                            const response = await fetch(`/api/cards/${card.card_id}/refund`, {
+                                method: 'POST'
+                            });
+                            if (response.ok) {
+                                successCount++;
+                            } else {
+                                failCount++;
+                            }
+                        } catch (error) {
+                            failCount++;
+                        }
+                    }
+
+                    if (successCount > 0) {
+                        showToast(`成功标记 ${successCount} 张已过期卡片为已申请退款${failCount > 0 ? `，失败 ${failCount} 张` : ''}`, 'success');
+                        // 刷新卡片列表
+                        loadCards();
+                        if (currentPage === 'dashboard') loadDashboard();
+                    } else if (failCount > 0) {
+                        showToast(`标记失败: ${failCount} 张卡片`, 'error');
+                    }
+                } else {
+                    showToast('标记失败: 无法获取卡片列表', 'error');
+                }
+            } catch (error) {
+                showToast('标记失败: ' + error.message, 'error');
+            }
+        }
+
+        // 备选复制到剪贴板方法（适用于不支持 Clipboard API 的环境）
+        function fallbackCopyToClipboard(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            textarea.style.top = '0';
+            textarea.style.left = '0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            try {
+                document.execCommand('copy');
+            } catch (err) {
+                console.error('复制失败:', err);
+            }
+            document.body.removeChild(textarea);
+        }
+
+        // 复制账单地址
+        function copyBillingAddress() {
+            const address = document.getElementById('billingAddress').textContent;
+
+            // 检查是否支持 Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(address).then(() => {
+                    showToast('账单地址已复制到剪贴板', 'success');
+                }).catch(err => {
+                    // 如果剪贴板API失败，使用备选方案
+                    fallbackCopyToClipboard(address);
+                    showToast('账单地址已复制到剪贴板', 'success');
+                });
+            } else {
+                // 不支持 Clipboard API，直接使用备选方案
+                fallbackCopyToClipboard(address);
+                showToast('账单地址已复制到剪贴板', 'success');
+            }
+        }
+
+        // 全选/取消全选
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.card-checkbox');
+
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = selectAll.checked;
+            });
+
+            updateSelection();
+        }
+
+        // 更新选择状态
+        function updateSelection() {
+            const checkboxes = document.querySelectorAll('.card-checkbox');
+            const checked = document.querySelectorAll('.card-checkbox:checked');
+            const selectAll = document.getElementById('selectAll');
+            const batchActions = document.getElementById('batchActions');
+            const selectedCount = document.getElementById('selectedCount');
+
+            // 更新全选框状态
+            if (checked.length === 0) {
+                selectAll.checked = false;
+                selectAll.indeterminate = false;
+            } else if (checked.length === checkboxes.length) {
+                selectAll.checked = true;
+                selectAll.indeterminate = false;
+            } else {
+                selectAll.checked = false;
+                selectAll.indeterminate = true;
+            }
+
+            // 显示/隐藏批量操作栏
+            if (checked.length > 0) {
+                batchActions.classList.remove('hidden');
+                selectedCount.textContent = checked.length;
+            } else {
+                batchActions.classList.add('hidden');
+            }
+        }
+
+        // 获取选中的卡片ID列表
+        function getSelectedCardIds() {
+            const checked = document.querySelectorAll('.card-checkbox:checked');
+            return Array.from(checked).map(cb => cb.value);
+        }
+
+        // 清除选择
+        function clearSelection() {
+            const checkboxes = document.querySelectorAll('.card-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            document.getElementById('selectAll').checked = false;
+            updateSelection();
+        }
+
+        // 批量标记退款
+        async function batchToggleRefund() {
+            const selectedIds = getSelectedCardIds();
+
+            if (selectedIds.length === 0) {
+                showToast('请先选择卡片', 'info');
+                return;
+            }
+
+            if (!confirm(`确定要批量标记 ${selectedIds.length} 张卡片为已申请退款吗？`)) return;
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const cardId of selectedIds) {
+                try {
+                    const response = await fetch(`/api/cards/${cardId}/refund`, { method: 'POST' });
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (error) {
+                    failCount++;
+                }
+            }
+
+            showToast(`成功标记 ${successCount} 张，失败 ${failCount} 张`, successCount > 0 ? 'success' : 'error');
+            clearSelection();
+            loadCards();
+        }
+
+        // 批量删除
+        async function batchDelete() {
+            const selectedIds = getSelectedCardIds();
+
+            if (selectedIds.length === 0) {
+                showToast('请先选择卡片', 'info');
+                return;
+            }
+
+            const needConfirm = document.getElementById('confirmDelete')?.checked ?? true;
+            if (needConfirm && !confirm(`确定要批量删除 ${selectedIds.length} 张卡片吗？\n\n⚠️ 警告：删除后将永久从数据库中移除，无法恢复！`)) return;
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const cardId of selectedIds) {
+                try {
+                    const response = await fetch(`/api/cards/${cardId}`, { method: 'DELETE' });
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        failCount++;
+                    }
+                } catch (error) {
+                    failCount++;
+                }
+            }
+
+            showToast(`成功删除 ${successCount} 张，失败 ${failCount} 张`, successCount > 0 ? 'success' : 'error');
+            clearSelection();
+            loadCards();
+            if (currentPage === 'dashboard') loadDashboard();
+        }
+
+        // 显示提示消息
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 fade-in ${
+                type === 'success' ? 'bg-green-500' :
+                type === 'error' ? 'bg-red-500' :
+                'bg-blue-500'
+            }`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-20px)';
+                toast.style.transition = 'all 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 格式化日期
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboard();
+        });
+    </script>
+</body>
+</html>

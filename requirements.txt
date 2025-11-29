@@ -1,0 +1,24 @@
+# FastAPI 核心依赖
+fastapi==0.115.5
+uvicorn[standard]==0.34.0
+
+# 数据库
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# HTTP 客户端
+httpx==0.28.1
+
+# 数据验证
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# 环境变量
+python-dotenv==1.0.1
+
+# 模板引擎
+jinja2==3.1.4
+
+# 开发工具
+pytest==8.3.4
+pytest-asyncio==0.25.2
